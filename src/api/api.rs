@@ -19,13 +19,8 @@ impl ApiV1 for ApiService {
     // queries
     async fn list_clubs(&self, request: Request<api::ListClubsRequest>) -> Result<Response<api::ListClubsResponse>, Status> {
         let payload = request.into_inner();
-        let after = if !payload.after.is_empty() {
-            ClubId::parse(payload.after.as_str())
-                .map_err(|_| Status::unknown("malformed after value"))
-                .map(|r| Some(r))
-            } else {
-                Ok(None)
-            }?;
+        let after = parse_optional(payload.after, ClubId::parse)
+            .map_err(|_| to_malformed_status("after"))?;
 
         self.club_usecase.list_clubs(after)
             .await
@@ -39,13 +34,8 @@ impl ApiV1 for ApiService {
 
     async fn list_teams(&self, request: Request<api::ListTeamsRequest>) -> Result<Response<api::ListTeamsResponse>, Status> {
         let payload = request.into_inner();
-        let after = if !payload.after.is_empty() {
-            TeamId::parse(payload.after.as_str())
-                .map_err(|_| Status::unknown("malformed after value"))
-                .map(|r| Some(r))
-        } else {
-            Ok(None)
-        }?;
+        let after = parse_optional(payload.after, TeamId::parse)
+            .map_err(|_| to_malformed_status("after"))?;
 
         self.team_usecase.list_teams(after)
             .await
@@ -63,24 +53,19 @@ impl ApiV1 for ApiService {
         let context = match payload.context {
             Some(api::list_communities_request::Context::ClubId(id)) => {
                 ClubId::parse(id.as_str())
-                    .map_err(|_| Status::unknown("malformed context value"))
+                    .map_err(|_| to_malformed_status("context"))
                     .map(|club| Some(CommunityContext::Club(club)))?
             },
             Some(api::list_communities_request::Context::TeamId(id)) => {
                 TeamId::parse(id.as_str())
-                    .map_err(|_| Status::unknown("malformed context value"))
+                    .map_err(|_| to_malformed_status("context"))
                     .map(|team| Some(CommunityContext::Team(team)))?
             },
             _ => None
         };
 
-        let after = if !payload.after.is_empty() {
-            CommunityId::parse(payload.after.as_str())
-                .map_err(|_| Status::unknown("malformed after value"))
-                .map(|r| Some(r))
-        } else {
-            Ok(None)
-        }?;
+        let after = parse_optional(payload.after, CommunityId::parse)
+            .map_err(|_| to_malformed_status("after"))?;
 
         self.social_usecase.list_communities(context, after)
             .await
@@ -95,14 +80,9 @@ impl ApiV1 for ApiService {
     async fn list_comments(&self, request: Request<api::ListCommentsRequest>) -> Result<Response<api::ListCommentsResponse>, Status> {
         let payload = request.into_inner();
         let reply_to = PostId::parse(payload.reply_to_id.as_str())
-            .map_err(|_| Status::unknown("malformed reply_to_id value"))?;
-        let after = if !payload.after.is_empty() {
-            CommentId::parse(payload.after.as_str())
-                .map_err(|_| Status::unknown("malformed after value"))
-                .map(|r| Some(r))
-        } else {
-            Ok(None)
-        }?;
+            .map_err(|_| to_malformed_status("reply_to_id"))?;
+        let after = parse_optional(payload.after, CommentId::parse)
+            .map_err(|_| to_malformed_status("after"))?;
 
         self.social_usecase.list_comments(reply_to, after)
             .await
@@ -123,19 +103,14 @@ impl ApiV1 for ApiService {
             },
             Some(api::list_feed_request::Feed::CommunityId(id)) => {
                 CommunityId::parse(id.as_str())
-                    .map_err(|_| Status::unknown("malformed community value"))
+                    .map_err(|_| to_malformed_status("community"))
                     .map(|community| Feed::Community(community))
             },
             _ =>
-                Err(Status::unknown("malformed feed"))
+                Err(to_malformed_status("feed"))
         }?;
-        let after = if !payload.after.is_empty() {
-            PostId::parse(payload.after.as_str())
-                .map_err(|_| Status::unknown("malformed after value"))
-                .map(|r| Some(r))
-        } else {
-            Ok(None)
-        }?;
+        let after = parse_optional(payload.after, PostId::parse)
+            .map_err(|_| to_malformed_status("after"))?;
 
         self.social_usecase.list_feed(feed, after)
             .await
@@ -150,8 +125,9 @@ impl ApiV1 for ApiService {
     // commands
     // - club
     async fn new_club(&self, request: Request<api::NewClubRequest>) -> Result<Response<api::NewClubResponse>, Status> {
-        let name = ClubName::parse(request.into_inner().name.as_str())
-            .map_err(|_| Status::unknown("malformed name value"))?;
+        let payload = request.into_inner();
+        let name = ClubName::parse(payload.name.as_str())
+            .map_err(|_| to_malformed_status("name"))?;
 
         let command = New {
             name
@@ -170,9 +146,9 @@ impl ApiV1 for ApiService {
     async fn set_club_logo(&self, request: Request<api::SetClubLogoRequest>) -> Result<Response<api::SetClubLogoResponse>, Status> {
         let payload = request.into_inner();
         let club = ClubId::parse(payload.club_id.as_str())
-            .map_err(|_| Status::unknown("malformed club_id value"))?;
+            .map_err(|_| to_malformed_status("club_id"))?;
         let logo = ImageId::parse(payload.logo_id.as_str())
-            .map_err(|_| Status::unknown("malformed logo_id value"))?;
+            .map_err(|_| to_malformed_status("logo_id"))?;
 
         let command = SetLogo {
             club,
@@ -189,9 +165,9 @@ impl ApiV1 for ApiService {
     async fn add_staff_member_to_club(&self, request: Request<api::AddStaffMemberToClubRequest>) -> Result<Response<api::AddStaffMemberToClubResponse>, Status> {
         let payload = request.into_inner();
         let club = ClubId::parse(payload.club_id.as_str())
-            .map_err(|_| Status::unknown("malformed club_id value"))?;
+            .map_err(|_| to_malformed_status("club_id"))?;
         let person = UserId::parse(payload.person_id.as_str())
-            .map_err(|_| Status::unknown("malformed person_id value"))?;
+            .map_err(|_| to_malformed_status("person_id"))?;
 
         let command = AddStaffMember {
             club,
@@ -209,9 +185,9 @@ impl ApiV1 for ApiService {
     async fn remove_staff_member_from_club(&self, request: Request<api::RemoveStaffMemberFromClubRequest>) -> Result<Response<api::RemoveStaffMemberFromClubResponse>, Status> {
         let payload = request.into_inner();
         let club = ClubId::parse(payload.club_id.as_str())
-            .map_err(|_| Status::unknown("malformed club_id value"))?;
+            .map_err(|_| to_malformed_status("club_id"))?;
         let staff_member = UserId::parse(payload.staff_member_id.as_str())
-            .map_err(|_| Status::unknown("malformed staff_member_id value"))?;
+            .map_err(|_| to_malformed_status("staff_member_id"))?;
 
         let command = RemoveStaffMember {
             club,
@@ -230,9 +206,9 @@ impl ApiV1 for ApiService {
     async fn new_team(&self, request: Request<api::NewTeamRequest>) -> Result<Response<api::NewTeamResponse>, Status> {
         let payload = request.into_inner();
         let name = TeamName::parse(payload.name.as_str())
-            .map_err(|_| Status::unknown("malformed name value"))?;
+            .map_err(|_| to_malformed_status("name"))?;
         let club = ClubId::parse(payload.club_id.as_str())
-            .map_err(|_| Status::unknown("malformed club_id value"))?;
+            .map_err(|_| to_malformed_status("club_id"))?;
 
         let command = crate::domain::team::commands::New {
             name,
@@ -252,9 +228,9 @@ impl ApiV1 for ApiService {
     async fn add_staff_member_to_team(&self, request: Request<api::AddStaffMemberToTeamRequest>) -> Result<Response<api::AddStaffMemberToTeamResponse>, Status> {
         let payload = request.into_inner();
         let team = TeamId::parse(payload.team_id.as_str())
-            .map_err(|_| Status::unknown("malformed team_id value"))?;
+            .map_err(|_| to_malformed_status("team_id"))?;
         let person = UserId::parse(payload.person_id.as_str())
-            .map_err(|_| Status::unknown("malformed person_id value"))?;
+            .map_err(|_| to_malformed_status("person_id"))?;
 
         let command = crate::domain::team::commands::AddStaffMember {
             team,
@@ -272,9 +248,9 @@ impl ApiV1 for ApiService {
     async fn remove_staff_member_from_team(&self, request: Request<api::RemoveStaffMemberFromTeamRequest>) -> Result<Response<api::RemoveStaffMemberFromTeamResponse>, Status> {
         let payload = request.into_inner();
         let team = TeamId::parse(payload.team_id.as_str())
-            .map_err(|_| Status::unknown("malformed team_id value"))?;
+            .map_err(|_| to_malformed_status("team_id"))?;
         let staff_member = UserId::parse(payload.staff_member_id.as_str())
-            .map_err(|_| Status::unknown("malformed staff_member_id value"))?;
+            .map_err(|_| to_malformed_status("staff_member_id"))?;
 
         let command = crate::domain::team::commands::RemoveStaffMember {
             team,
@@ -294,22 +270,22 @@ impl ApiV1 for ApiService {
     async fn new_community(&self, request: Request<api::NewCommunityRequest>) -> Result<Response<api::NewCommunityResponse>, Status> {
         let payload = request.into_inner();
         let name = CommunityName::parse(payload.name.as_str())
-            .map_err(|_| Status::unknown("malformed name value"))?;
+            .map_err(|_| to_malformed_status("name"))?;
         let context = match payload.context {
             Some(api::new_community_request::Context::ClubId(id)) => {
                 let club = ClubId::parse(id.as_str())
-                    .map_err(|_| Status::unknown("malformed context value"))?;
+                    .map_err(|_| to_malformed_status("context"))?;
 
                 Ok(CommunityContext::Club(club))
             },
             Some(api::new_community_request::Context::TeamId(id)) => {
                 let team = TeamId::parse(id.as_str())
-                    .map_err(|_| Status::unknown("malformed context value"))?;
+                    .map_err(|_| to_malformed_status("context"))?;
 
                 Ok(CommunityContext::Team(team))
             },
             _ =>
-              Err(Status::unknown("malformed context value"))
+              Err(to_malformed_status("context"))
         }?;
 
         let command = crate::domain::social::commands::community::New {
@@ -330,9 +306,9 @@ impl ApiV1 for ApiService {
     async fn set_community_logo(&self, request: Request<api::SetCommunityLogoRequest>) -> Result<Response<api::SetCommunityLogoResponse>, Status> {
         let payload = request.into_inner();
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
         let logo = ImageId::parse(payload.logo_id.as_str())
-            .map_err(|_| Status::unknown("malformed logo_id value"))?;
+            .map_err(|_| to_malformed_status("logo_id"))?;
 
         let command = domain::social::commands::community::SetLogo {
             community,
@@ -350,9 +326,9 @@ impl ApiV1 for ApiService {
     async fn promote_community_member_to_editor(&self, request: Request<api::PromoteCommunityMemberToEditorRequest>) -> Result<Response<api::PromoteCommunityMemberToEditorResponse>, Status> {
         let payload = request.into_inner();
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
         let member = UserId::parse(payload.member_id.as_str())
-            .map_err(|_| Status::unknown("malformed member_id value"))?;
+            .map_err(|_| to_malformed_status("member_id"))?;
 
         let command = domain::social::commands::community::PromoteMemberToEditor {
             community,
@@ -370,9 +346,9 @@ impl ApiV1 for ApiService {
     async fn demote_community_editor(&self, request: Request<api::DemoteCommunityEditorRequest>) -> Result<Response<api::DemoteCommunityEditorResponse>, Status> {
         let payload = request.into_inner();
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
         let editor = UserId::parse(payload.editor_id.as_str())
-            .map_err(|_| Status::unknown("malformed editor_id value"))?;
+            .map_err(|_| to_malformed_status("editor_id"))?;
 
         let command = domain::social::commands::community::DemoteEditor {
             community,
@@ -391,7 +367,7 @@ impl ApiV1 for ApiService {
         let person = current_user(request.metadata())?;
         let payload = request.into_inner();
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
 
         let command = domain::social::commands::community::Join {
             community,
@@ -410,7 +386,7 @@ impl ApiV1 for ApiService {
         let member = current_user(request.metadata())?;
         let payload = request.into_inner();
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
 
         let command = domain::social::commands::community::Leave {
             community,
@@ -430,13 +406,13 @@ impl ApiV1 for ApiService {
         let author = current_user(request.metadata())?;
         let payload = request.into_inner();
         let text = PostText::parse(payload.text.as_str())
-            .map_err(|_| Status::unknown("malformed text value"))?;
+            .map_err(|_| to_malformed_status("text"))?;
         let community = CommunityId::parse(payload.community_id.as_str())
-            .map_err(|_| Status::unknown("malformed community_id value"))?;
+            .map_err(|_| to_malformed_status("community_id"))?;
         let attachment_elements: Result<Vec<PostAttachment>, String> = payload.attachments
             .into_iter().map(parse_attachment).collect();
         let attachments = PostAttachments::from_vec(attachment_elements
-            .map_err(|err| Status::unknown(err))?);
+            .map_err(|_| to_malformed_status("attachments")) ?);
 
         let command = domain::social::commands::post::PublishPost {
             community,
@@ -458,7 +434,7 @@ impl ApiV1 for ApiService {
     async fn remove_post(&self, request: Request<api::RemovePostRequest>) -> Result<Response<api::RemovePostResponse>, Status> {
         let payload = request.into_inner();
         let post = PostId::parse(payload.post_id.as_str())
-            .map_err(|_| Status::unknown("malformed post_id value"))?;
+            .map_err(|_| to_malformed_status("post_id"))?;
 
         let command = domain::social::commands::post::RemovePost {
             post,
@@ -477,9 +453,9 @@ impl ApiV1 for ApiService {
         let author = current_user(request.metadata())?;
         let payload = request.into_inner();
         let post = PostId::parse(payload.post_id.as_str())
-            .map_err(|_| Status::unknown("malformed post_id value"))?;
+            .map_err(|_| to_malformed_status("post_id"))?;
         let reaction = parse_post_reaction(payload.emotion, post, author)
-            .ok_or(Status::unknown("unsupported emotion"))?;
+            .ok_or(to_malformed_status("emotion"))?;
 
         let command = domain::social::commands::post_reaction::ReactToPost {
             reaction,
@@ -497,9 +473,9 @@ impl ApiV1 for ApiService {
         let author = current_user(request.metadata())?;
         let payload = request.into_inner();
         let post = PostId::parse(payload.post_id.as_str())
-            .map_err(|_| Status::unknown("malformed post_id value"))?;
+            .map_err(|_| to_malformed_status("post_id"))?;
         let reaction = parse_post_reaction(payload.emotion, post, author)
-            .ok_or(Status::unknown("unsupported emotion"))?;
+            .ok_or(to_malformed_status("emotion"))?;
 
         let command = domain::social::commands::post_reaction::RetractPostReaction {
             reaction,
@@ -518,9 +494,9 @@ impl ApiV1 for ApiService {
         let author = current_user(request.metadata())?;
         let payload = request.into_inner();
         let reply_to = PostId::parse(payload.reply_to_id.as_str())
-            .map_err(|_| Status::unknown("malformed reply_to_id value"))?;
+            .map_err(|_| to_malformed_status("reply_to_id"))?;
         let text = CommentText::parse(payload.text.as_str())
-            .map_err(|_| Status::unknown("malformed text value"))?;
+            .map_err(|_| to_malformed_status("text"))?;
 
         let command = domain::social::commands::comment::PublishComment {
             reply_to,
@@ -541,7 +517,7 @@ impl ApiV1 for ApiService {
     async fn remove_comment(&self, request: Request<api::RemoveCommentRequest>) -> Result<Response<api::RemoveCommentResponse>, Status> {
         let payload = request.into_inner();
         let comment = CommentId::parse(payload.comment_id.as_str())
-            .map_err(|_| Status::unknown("malformed comment_id value"))?;
+            .map_err(|_| to_malformed_status("comment_id"))?;
 
         let command = domain::social::commands::comment::RemoveComment {
             comment,
@@ -557,10 +533,6 @@ impl ApiV1 for ApiService {
 }
 
 // helpers
-fn to_status(error: Box<dyn Error + Send + Sync>) -> Status {
-    Status::unknown(error.to_string())
-}
-
 fn current_user(metadata: &MetadataMap) -> Result<UserId, Status> {
     let error = || Status::unauthenticated("corrucpt authorization data");
 
@@ -580,6 +552,18 @@ fn current_user(metadata: &MetadataMap) -> Result<UserId, Status> {
 }
 
 // parse + to transfer objects
+fn parse_optional<T, E>(input: impl Into<String>, parse: fn(&str) -> Result<T, E>) -> Result<Option<T>, E> {
+    let value: String = input.into();
+    if value.is_empty() {
+        return Ok(None);
+    }
+
+    match parse(value.as_str()) {
+        Ok(result) => Ok(Some(result)),
+        Err(error) => Err(error)
+    }
+}
+
 fn parse_post_reaction(emotion: i32, post: PostId, author: UserId) -> Option<PostReaction> {
     if emotion == api::Emotion::Love as i32 {
         Some(PostReaction::Love(author, post))
@@ -690,4 +674,13 @@ fn to_feed_listing(listing: &FeedListing) -> api::list_feed_response::FeedListin
             insightful: listing.reactions_insightful,
         }),
     }
+}
+
+// errors
+fn to_status(error: Box<dyn Error + Send + Sync>) -> Status {
+    Status::unknown(error.to_string())
+}
+
+fn to_malformed_status(field: &str) -> Status {
+    Status::unknown(format!("malformed {} value", field))
 }

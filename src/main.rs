@@ -55,7 +55,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Server::builder()
         .add_service(ApiV1Server::new(service))
         .serve(configuration.api_address)
-        .await?;
-
-    Ok(())
+        .await
+        .map_err(|err| err.into())
 }
