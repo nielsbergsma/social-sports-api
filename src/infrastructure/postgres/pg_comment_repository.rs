@@ -33,7 +33,7 @@ impl crate::domain::social::repositories::CommentRepository for PgCommentReposit
 
             select data
             from comments
-            where ($2 :: text is null or row > (select coalesce(max(row), bigint_max()) from comments where id = $2))
+            where ($2 is null or row > (select coalesce(max(row), bigint_max()) from comments where id = $2))
             limit 25"#;
 
         let rows: Vec<CommentRow> = sqlx::query_as(sql)

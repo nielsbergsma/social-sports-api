@@ -33,7 +33,7 @@ impl crate::domain::team::repositories::TeamRepository for PgTeamRepository {
 
             select data
             from teams
-            where ($1 :: text is null or row > (select coalesce(max(row), bigint_max()) from Teams where id = $1))
+            where ($1 is null or row > (select coalesce(max(row), bigint_max()) from Teams where id = $1))
             limit 25"#;
 
         let rows: Vec<TeamRow> = sqlx::query_as(sql)

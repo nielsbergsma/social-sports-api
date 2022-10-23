@@ -54,7 +54,7 @@ impl crate::domain::club::repositories::ClubRepository for PgClubRepository {
 
             select data
             from clubs
-            where ($1 :: text is null or row > (select coalesce(max(row), bigint_max()) from clubs where id = $1))
+            where ($1 is null or row > (select coalesce(max(row), bigint_max()) from clubs where id = $1))
             limit 25"#;
 
         let rows: Vec<ClubRow> = sqlx::query_as(sql)

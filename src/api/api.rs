@@ -27,7 +27,7 @@ impl ApiV1 for ApiService {
             .map_err(to_status)
             .map(|result|
                 Response::new(api::ListClubsResponse {
-                    clubs: result.iter().map(to_club).collect(),
+                    clubs: result.map(to_club),
                 })
             )
     }
@@ -42,7 +42,7 @@ impl ApiV1 for ApiService {
             .map_err(to_status)
             .map(|result|
                 Response::new(api::ListTeamsResponse {
-                    teams: result.iter().map(to_team).collect(),
+                    teams: result.map(to_team),
                 })
             )
     }
@@ -72,7 +72,7 @@ impl ApiV1 for ApiService {
             .map_err(to_status)
             .map(|result|
                 Response::new(api::ListCommunitiesResponse {
-                    communities: result.iter().map(to_community).collect(),
+                    communities: result.map(to_community),
                 })
             )
     }
@@ -89,7 +89,7 @@ impl ApiV1 for ApiService {
             .map_err(to_status)
             .map(|result|
                 Response::new(api::ListCommentsResponse {
-                    comments: result.iter().map(to_comment).collect(),
+                    comments: result.map(to_comment),
                 })
             )
     }
@@ -264,7 +264,6 @@ impl ApiV1 for ApiService {
                 Response::new(api::RemoveStaffMemberFromTeamResponse {})
             )
     }
-
 
     // - community
     async fn new_community(&self, request: Request<api::NewCommunityRequest>) -> Result<Response<api::NewCommunityResponse>, Status> {
@@ -683,4 +682,15 @@ fn to_status(error: Box<dyn Error + Send + Sync>) -> Status {
 
 fn to_malformed_status(field: &str) -> Status {
     Status::unknown(format!("malformed {} value", field))
+}
+
+// extensions
+pub trait VecExt<T> {
+    fn map<U>(&self, f: fn(&T) -> U) -> Vec<U>;
+}
+
+impl<T> VecExt<T> for Vec<T> {
+    fn map<U>(&self, f: fn(&T) -> U) -> Vec<U> {
+        self.iter().map(f).collect()
+    }
 }

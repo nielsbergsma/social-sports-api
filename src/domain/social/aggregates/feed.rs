@@ -33,6 +33,7 @@ impl FeedFragment {
                 .collect(),
         }
     }
+
     pub fn iter(&self) -> Iter<'_, FeedListing> {
         self.listings.iter()
     }
